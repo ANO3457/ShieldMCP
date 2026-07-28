@@ -13,6 +13,7 @@ build/
 .env
 .venv/
 venv/
+temp_auto_push.bat
 
 # Trained model weights (large; regenerate with training scripts)
 models/stage1_classifier/
@@ -28,3 +29,5 @@ paper/*.blg
 paper/*.log
 paper/*.out
 paper/*.bbl
+.gitignore
+branch_structure.json

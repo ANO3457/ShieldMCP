@@ -45,6 +45,11 @@ class StdioProxy:
         # Stable per-connection session so cross-call correlation and response
         # tool-name resolution work across the whole client session.
         self._session_id: str = str(uuid.uuid4())
+        # Framing observed from each peer, so we forward using the framing that
+        # peer speaks. The MCP stdio spec is newline-delimited JSON; some clients
+        # use LSP-style Content-Length. We detect and mirror rather than assume.
+        self._client_framing: str = "line"
+        self._server_framing: str = "line"
 
     async def start(self) -> None:
         """Start the proxy: initialize pipeline and spawn the real MCP server."""
@@ -77,12 +82,14 @@ class StdioProxy:
         assert self._server_process and self._server_process.stdin
 
         try:
-            async for message in _read_jsonrpc_messages(reader):
+            async for message, framing in _read_jsonrpc_messages(reader):
+                self._client_framing = framing
                 intercepted = await self._intercept_client_message(message)
                 if intercepted is not None:
-                    raw = json.dumps(intercepted)
-                    frame = f"Content-Length: {len(raw)}\r\n\r\n{raw}"
-                    self._server_process.stdin.write(frame.encode())
+                    # Forward using the framing the server speaks (defaults to the
+                    # spec's newline-delimited form until the server reveals otherwise).
+                    frame = _encode_frame(intercepted, self._server_framing)
+                    self._server_process.stdin.write(frame)
                     await self._server_process.stdin.drain()
         except (asyncio.CancelledError, ConnectionError):
             pass
@@ -99,12 +106,13 @@ class StdioProxy:
         writer = asyncio.StreamWriter(writer_transport, writer_protocol, None, asyncio.get_event_loop())
 
         try:
-            async for message in _read_jsonrpc_messages(self._server_process.stdout):
+            async for message, framing in _read_jsonrpc_messages(self._server_process.stdout):
+                self._server_framing = framing
                 intercepted = await self._intercept_server_message(message)
                 if intercepted is not None:
-                    raw = json.dumps(intercepted)
-                    frame = f"Content-Length: {len(raw)}\r\n\r\n{raw}"
-                    writer.write(frame.encode())
+                    # Forward using the framing the client speaks.
+                    frame = _encode_frame(intercepted, self._client_framing)
+                    writer.write(frame)
                     await writer.drain()
         except (asyncio.CancelledError, ConnectionError):
             pass
@@ -193,30 +201,58 @@ def _make_error_response(msg_id: Any, code: int, message: str) -> dict[str, Any]
     }
 
 
-async def _read_jsonrpc_messages(reader: asyncio.StreamReader):
-    """Parse JSON-RPC messages with Content-Length framing from a stream."""
-    while True:
-        # Read headers
-        headers = {}
-        while True:
-            line = await reader.readline()
-            if not line:
-                return
-            line_str = line.decode("utf-8").strip()
-            if not line_str:
-                break
-            if ":" in line_str:
-                key, value = line_str.split(":", 1)
-                headers[key.strip().lower()] = value.strip()
+def _encode_frame(msg: dict, framing: str) -> bytes:
+    """Serialize a JSON-RPC message using the peer's framing.
 
-        content_length = int(headers.get("content-length", 0))
-        if content_length == 0:
-            # Try reading as newline-delimited JSON (some MCP servers use this)
+    'line' is the MCP stdio spec's newline-delimited JSON; 'lsp' is the
+    LSP-style Content-Length framing some clients use.
+    """
+    raw = json.dumps(msg)
+    if framing == "lsp":
+        return f"Content-Length: {len(raw)}\r\n\r\n{raw}".encode()
+    return (raw + "\n").encode()
+
+
+async def _read_jsonrpc_messages(reader: asyncio.StreamReader):
+    """Parse JSON-RPC messages from a stream, auto-detecting the framing.
+
+    Yields (message, framing) where framing is 'line' (newline-delimited JSON,
+    the MCP stdio spec) or 'lsp' (Content-Length headers). Detection is per
+    message: a line beginning with 'Content-Length:' switches to LSP framing;
+    any other non-empty line is treated as one complete JSON message.
+    """
+    while True:
+        line = await reader.readline()
+        if not line:
+            return
+        line_str = line.decode("utf-8").strip()
+        if not line_str:
             continue
 
-        body = await reader.readexactly(content_length)
-        try:
-            msg = json.loads(body.decode("utf-8"))
-            yield msg
-        except json.JSONDecodeError:
-            logger.error("Failed to parse JSON-RPC message: %s", body[:200])
+        if line_str.lower().startswith("content-length:"):
+            # LSP framing: this and following lines are headers until a blank line.
+            headers = {"content-length": line_str.split(":", 1)[1].strip()}
+            while True:
+                hline = await reader.readline()
+                if not hline:
+                    return
+                hstr = hline.decode("utf-8").strip()
+                if not hstr:
+                    break
+                if ":" in hstr:
+                    key, value = hstr.split(":", 1)
+                    headers[key.strip().lower()] = value.strip()
+            content_length = int(headers.get("content-length", 0))
+            if content_length == 0:
+                continue
+            body = await reader.readexactly(content_length)
+            try:
+                yield json.loads(body.decode("utf-8")), "lsp"
+            except json.JSONDecodeError:
+                logger.error("Failed to parse JSON-RPC message: %s", body[:200])
+        else:
+            # Newline-delimited JSON (MCP stdio spec).
+            try:
+                yield json.loads(line_str), "line"
+            except json.JSONDecodeError:
+                logger.error("Failed to parse JSON-RPC line: %s", line_str[:200])
