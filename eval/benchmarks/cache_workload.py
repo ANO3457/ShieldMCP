@@ -214,7 +214,7 @@ async def run_workload(
             if item["poisoned"]:
                 unsafe_serves += 1
 
-        if policy == "gated" and cache is not None:
+        if policy in ("gated", "gated-shared") and cache is not None:
             cache.put(key, item["response"], verdict_passed=not was_blocked,
                       principal=principal)
 
@@ -251,7 +251,7 @@ async def run_workload(
             "unsafe_from_cache": unsafe_from_cache,
             "validations": validations,
             "validations_saved": requests - validations,
-            "cache_stats": cache.stats.as_dict() if cache else None,
+            "cache_stats": cache.stats.as_dict() if cache is not None else None,
             "tier_stats_stage3": _s3.get_tier_stats(),
         },
         "latency_ms": {
@@ -266,7 +266,7 @@ async def run_workload(
     with open(out, "w") as f:
         json.dump(results, f, indent=2)
 
-    hit_rate = (cache.stats.hits / max(cache.stats.lookups, 1)) if cache else 0.0
+    hit_rate = (cache.stats.hits / max(cache.stats.lookups, 1)) if cache is not None else 0.0
     table = Table(title=f"Cache workload: policy={policy} backend={backend}")
     for col in ["Requests", "Hit rate", "Validations", "Unsafe serves",
                 "(from cache)", "p50 ms", "p95 ms"]:
