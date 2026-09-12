@@ -109,9 +109,15 @@ async def run_workload(
     output_dir: Path,
     band_low: float | None = None,
     min_words: int | None = None,
+    max_poisoned: int | None = None,
 ) -> dict:
     rng = random.Random(seed)
     population = build_population()
+    if max_poisoned is not None:
+        poisoned = [i for i in population if i["poisoned"]]
+        benign = [i for i in population if not i["poisoned"]]
+        rng.shuffle(poisoned)
+        population = benign + poisoned[:max_poisoned]
     # Shuffle so poisoned items are spread across the popularity ranking
     # rather than concentrated at the head or tail.
     rng.shuffle(population)
@@ -140,6 +146,12 @@ async def run_workload(
     elif policy == "gated":
         cache = GovernedResponseCache(ResponseCacheConfig(
             per_principal=True, require_clean_verdict=True, ttl_seconds=1e9,
+        ))
+    elif policy == "gated-shared":
+        # Admission-gated but with one namespace across principals: isolates
+        # the hit-rate cost of principal isolation itself.
+        cache = GovernedResponseCache(ResponseCacheConfig(
+            per_principal=False, require_clean_verdict=True, ttl_seconds=1e9,
         ))
 
     from shieldmcp.stage3 import response_analyzer as _s3
@@ -277,14 +289,17 @@ def main() -> None:
     parser.add_argument("--backend", type=str, default="heuristic",
                         choices=["heuristic", "classifier", "tiered"])
     parser.add_argument("--policy", type=str, default="gated",
-                        choices=["none", "unsafe", "gated"])
+                        choices=["none", "unsafe", "gated", "gated-shared"])
     parser.add_argument("--band-low", type=float, default=None)
     parser.add_argument("--min-words", type=int, default=None)
+    parser.add_argument("--max-poisoned", type=int, default=None,
+                        help="Subsample poisoned items to this count (low-poison-share runs)")
     parser.add_argument("--output-dir", type=str, default="eval/results/cache")
     args = parser.parse_args()
     asyncio.run(run_workload(
         args.requests, args.seed, args.backend, args.policy, args.zipf_s,
         Path(args.output_dir), band_low=args.band_low, min_words=args.min_words,
+        max_poisoned=args.max_poisoned,
     ))
 
 
