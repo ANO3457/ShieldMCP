@@ -14,6 +14,7 @@ build/
 .venv/
 venv/
 
+temp_auto_push.bat
 # Trained model weights (large; regenerate with training scripts)
 models/stage1_classifier/
 models/stage3_token_classifier/
@@ -30,3 +31,5 @@ paper/*.out
 paper/*.bbl
 workshop/workshop_demo.db
 workshop/chat_demo.db
+.gitignore
+branch_structure.json
