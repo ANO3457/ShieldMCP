@@ -143,6 +143,32 @@ async def test_benign_drift_revalidates_and_repins():
 
 
 @pytest.mark.asyncio
+async def test_unpinned_tool_validated_before_first_call():
+    primary = FakePipeline()
+    enf = make(primary=primary)
+    # no expose_tools: the tool was never approved
+    action, _ = await enf.enforce_call(
+        "srv", "read_file", {"path": "x"}, current_definition=dict(TOOL))
+    assert action == Action.PASS
+    assert "validate_tools" in primary.calls  # validated at first call
+    # now pinned: second call does not re-validate
+    primary.calls.clear()
+    await enf.enforce_call(
+        "srv", "read_file", {"path": "x"}, current_definition=dict(TOOL))
+    assert "validate_tools" not in primary.calls
+
+
+@pytest.mark.asyncio
+async def test_unpinned_tool_failing_validation_is_blocked():
+    primary = FakePipeline(block=True)
+    enf = make(primary=primary)
+    action, _ = await enf.enforce_call(
+        "srv", "read_file", {"path": "x"}, current_definition=dict(TOOL))
+    assert action == Action.BLOCK
+    assert any(e.kind == "refused" for e in enf.events)
+
+
+@pytest.mark.asyncio
 async def test_unchanged_definition_is_not_drift():
     enf = make()
     await enf.expose_tools("srv", [TOOL])

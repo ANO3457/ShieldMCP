@@ -102,19 +102,6 @@ async def run_workload(
     rng = random.Random(seed)
     population = build_tool_population()
     rng.shuffle(population)
-    ranks = zipf_ranks(len(population), requests, zipf_s, rng)
-
-    # schedule drift events: at request i, tool j drifts (malicious or not)
-    # with payload k; fully precomputed so every policy sees the identical
-    # sequence of drifted definitions regardless of catch timing
-    rng_churn = random.Random(seed + 3000)
-    drift_at: dict[int, tuple[int, bool, int]] = {}
-    for i in range(requests):
-        if rng_churn.random() < churn_rate:
-            j = rng_churn.randrange(len(population))
-            malicious = rng_churn.random() < 0.5
-            k = rng_churn.randrange(len(MALICIOUS_SUFFIXES))
-            drift_at[i] = (j, malicious, k)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     cfg = ShieldMCPConfig()
@@ -136,12 +123,37 @@ async def run_workload(
         ),
     )
 
-    # session start: approve and pin the whole inventory per server
+    # session inventory: only tools that validate clean at approval enter
+    # service (identical filter across policies; the detector is
+    # deterministic), then approve and pin per server
     by_server: dict[str, list[dict]] = {}
+    for item in population:
+        by_server.setdefault(item["server_id"], []).append(item["tool"])
+    approved: set[tuple[str, str]] = set()
+    for server_id, tools in by_server.items():
+        _action, kept, _alerts = await pipeline.validate_tools(
+            server_id + "-adm", tools)
+        approved.update((server_id, t.get("name")) for t in kept)
+    population = [it for it in population
+                  if (it["server_id"], it["tool"]["name"]) in approved]
+    by_server = {}
     for item in population:
         by_server.setdefault(item["server_id"], []).append(item["tool"])
     for server_id, tools in by_server.items():
         await enforced.expose_tools(server_id, tools)
+
+    # workload and drift schedule are computed on the filtered population,
+    # fully precomputed so every policy sees the identical request stream
+    # and the identical sequence of drifted definitions
+    ranks = zipf_ranks(len(population), requests, zipf_s, rng)
+    rng_churn = random.Random(seed + 3000)
+    drift_at: dict[int, tuple[int, bool, int]] = {}
+    for i in range(requests):
+        if rng_churn.random() < churn_rate:
+            j = rng_churn.randrange(len(population))
+            malicious = rng_churn.random() < 0.5
+            k = rng_churn.randrange(len(MALICIOUS_SUFFIXES))
+            drift_at[i] = (j, malicious, k)
 
     # live definitions drift over time; compromised[j] marks tools whose
     # current definition is maliciously drifted and not yet re-validated

@@ -301,21 +301,30 @@ class PolicyEnforcedPipeline:
         if self.config.schema_pinning and current_definition is not None:
             sig = self._signature(server_id, current_definition)
             status = self.pins.check(server_id, tool_name, sig.content_hash)
-            if status == "drift":
-                self.stats.drift_blocks += 1
-                self._record("schema_drift_block",
-                             "definition changed since approval; "
-                             "re-validating before any call is allowed",
-                             server_id, tool_name)
+            if status != "match":
+                # drifted since approval, or never approved at all; either
+                # way the current definition must validate clean before any
+                # call is allowed
+                if status == "drift":
+                    self.stats.drift_blocks += 1
+                    self._record("schema_drift_block",
+                                 "definition changed since approval; "
+                                 "re-validating before any call is allowed",
+                                 server_id, tool_name)
                 action, revalidated, _alerts = await self.expose_tools(
                     server_id, [current_definition], scope=scope,
                 )
                 if revalidated and action != Action.BLOCK:
-                    self.stats.repins += 1
-                    self._record("schema_repinned",
-                                 "drifted definition re-validated clean",
-                                 server_id, tool_name)
+                    if status == "drift":
+                        self.stats.repins += 1
+                        self._record("schema_repinned",
+                                     "drifted definition re-validated clean",
+                                     server_id, tool_name)
                 else:
+                    if status == "unpinned":
+                        self._record("refused",
+                                     "unapproved tool failed validation at "
+                                     "first call", server_id, tool_name)
                     return Action.BLOCK, []
 
         action, alerts = await self._apply_policy(
