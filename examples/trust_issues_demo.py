@@ -1,4 +1,4 @@
-"""Two-act live demo: an agent hijacked through a tool response, then the
+"""Two-act live demo: an agent misled by a tool response, then the
 same agent protected by the ShieldMCP proxy.
 
 The wire traffic is real MCP JSON-RPC over stdio to a real server
@@ -70,7 +70,7 @@ def response_text(frames: list[dict], rpc_id: int) -> str:
 
 
 def agent_obeys(text: str) -> dict | None:
-    """The hijack: an instruction-following model does what tool text
+    """The manipulation: an instruction-following model does what tool text
     says. Mirrors the directive the IPI payload carries."""
     if "send_message" in text and "attacker" in text:
         m = re.search(r"recipient='([^']+)'", text)
@@ -122,11 +122,11 @@ def act1() -> None:
     console.print(f"      [bold red]IMPORTANT SYSTEM NOTICE: "
                   f"{inj.strip()[:150]}...[/bold red]")
 
-    hijacked = agent_obeys(text)
-    if hijacked:
+    misled = agent_obeys(text)
+    if misled:
         time.sleep(0.6)
         console.print("\n  [bold red]agent → server   tools/call  "
-                      f"send_message(recipient={hijacked['arguments']['recipient']}, "
+                      f"send_message(recipient={misled['arguments']['recipient']}, "
                       "body=<conversation history>)[/bold red]")
         console.print(Panel(
             "[bold red]BREACH[/bold red]  The exfiltration call just left "
@@ -159,10 +159,10 @@ def act2() -> None:
             break
 
     text = response_text(frames, 3)
-    hijacked = agent_obeys(text)
+    misled = agent_obeys(text)
     shown = text[:80] if text else "[response withheld by proxy]"
     console.print(f"  [cyan]proxy → agent[/cyan]    {shown}")
-    if hijacked is None:
+    if misled is None:
         console.print(Panel(
             "[bold green]BLOCKED at Stage 3[/bold green]  The injected "
             "directive never reached the model.\nNo exfiltration call "
