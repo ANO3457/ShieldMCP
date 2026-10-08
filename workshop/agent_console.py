@@ -231,52 +231,53 @@ HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>ShieldMCP Agent Console</title>
 <style>
 :root{--bg:#0a0e14;--panel:#111722;--panel2:#0d1320;--line:#1e2735;
-  --ink:#e6edf3;--dim:#7d8aa0;--cyan:#35d0ba;--red:#ff5d5d;--amber:#ffb454;
+  --ink:#e6edf3;--dim:#8b98ad;--cyan:#35d0ba;--red:#ff5d5d;--amber:#ffb454;
   --green:#3fe08a;--violet:#9d7cff}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,
+body{background:var(--bg);color:var(--ink);font:20px/1.5 -apple-system,
   BlinkMacSystemFont,"Segoe UI",sans-serif;height:100vh;overflow:hidden}
-.top{display:flex;align-items:center;gap:16px;padding:14px 22px;
+.top{display:flex;align-items:center;gap:18px;padding:16px 26px;
   border-bottom:1px solid var(--line);background:var(--panel2)}
-.logo{font-weight:800;letter-spacing:.5px;font-size:19px}
+.logo{font-weight:800;letter-spacing:.5px;font-size:26px}
 .logo span{color:var(--cyan)}
-.sub{color:var(--dim);font-size:13px}
-.model{font-family:ui-monospace,monospace;font-size:11px;color:var(--violet);
-  border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+.sub{color:var(--dim);font-size:16px}
+.model{font-family:ui-monospace,monospace;font-size:15px;color:var(--violet);
+  border:1px solid var(--line);border-radius:7px;padding:5px 11px}
 .spacer{flex:1}
-.toggle{display:flex;align-items:center;gap:12px;padding:8px 16px;
+.toggle{display:flex;align-items:center;gap:13px;padding:11px 20px;
   border:1px solid var(--line);border-radius:999px;background:var(--panel);
   cursor:pointer;user-select:none;transition:.2s}
 .toggle.on{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan) inset}
-.dot{width:11px;height:11px;border-radius:50%;background:var(--red)}
-.toggle.on .dot{background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
-.toggle b{font-size:14px}.toggle .st{color:var(--dim);font-size:12px}
-.wrap{display:grid;grid-template-columns:1fr 430px;height:calc(100vh - 59px)}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--red)}
+.toggle.on .dot{background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.toggle b{font-size:19px}.toggle .st{color:var(--dim);font-size:15px}
+.wrap{display:grid;grid-template-columns:1fr 500px;height:calc(100vh - 71px)}
 .chat{display:flex;flex-direction:column;border-right:1px solid var(--line)}
-.scenario{display:flex;gap:10px;padding:14px 22px;
+.scenario{display:flex;gap:12px;padding:16px 26px;flex-wrap:wrap;
   border-bottom:1px solid var(--line);background:var(--panel2)}
-.chip{padding:7px 14px;border:1px solid var(--line);border-radius:8px;
-  background:var(--panel);cursor:pointer;font-size:13px;color:var(--dim);
+.chip{padding:9px 18px;border:1px solid var(--line);border-radius:9px;
+  background:var(--panel);cursor:pointer;font-size:16px;color:var(--dim);
   transition:.15s}
 .chip.sel{border-color:var(--violet);color:var(--ink)}
-.chip small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
-.msgs{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;
-  gap:14px}
-.row{display:flex;gap:11px;animation:in .3s ease}
+.chip small{display:block;color:var(--dim);font-size:13px;margin-top:2px}
+.msgs{flex:1;overflow-y:auto;padding:26px;display:flex;flex-direction:column;
+  gap:17px}
+.row{display:flex;gap:14px;animation:in .3s ease}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
-.av{width:30px;height:30px;border-radius:7px;flex:0 0 30px;display:grid;
-  place-items:center;font-size:14px;font-weight:700}
+.av{width:40px;height:40px;border-radius:9px;flex:0 0 40px;display:grid;
+  place-items:center;font-size:19px;font-weight:700}
 .av.user{background:#223}.av.agent{background:#1a2b2a;color:var(--cyan)}
 .av.server{background:#2a2230;color:var(--violet)}
 .av.shield{background:#102a1e;color:var(--green)}.av.bad{background:#2e1414;
   color:var(--red)}.av.mail{background:#1a2230;color:var(--amber)}
-.bub{flex:1;padding:11px 14px;border-radius:10px;background:var(--panel);
+.bub{flex:1;padding:14px 18px;border-radius:11px;background:var(--panel);
   border:1px solid var(--line)}
-.who{font-size:11px;color:var(--dim);margin-bottom:3px;text-transform:uppercase;
+.who{font-size:14px;color:var(--dim);margin-bottom:4px;text-transform:uppercase;
   letter-spacing:.5px}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px}
 .inj{color:var(--red);background:#2a0f0f;border:1px solid #4a1c1c;
-  padding:8px 10px;border-radius:7px;margin-top:6px;font-size:13px}
+  padding:11px 13px;border-radius:8px;margin-top:8px;font-size:18px;
+  font-weight:500}
 .cleanpart{color:var(--dim)}
 .verdict{border-color:var(--amber);background:#241c0e}
 .verdict .who{color:var(--amber)}
@@ -284,48 +285,48 @@ body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,
   background:#200d0d}
 .breach{border-color:var(--red);background:#200d0d}.breach .who{color:var(--red)}
 .safe{border-color:var(--green);background:#0e1f16}.safe .who{color:var(--green)}
-.tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:5px;
-  margin-right:6px;font-weight:600}
+.tag{display:inline-block;font-size:14px;padding:3px 11px;border-radius:6px;
+  margin-right:8px;font-weight:700}
 .tag.crit{background:#3a1414;color:var(--red)}
 .tag.bad{background:#3a1414;color:var(--red)}
 .tag.ok{background:#12301f;color:var(--green)}
-.think{display:flex;gap:6px;align-items:center;color:var(--dim);font-size:13px}
-.think .d{width:6px;height:6px;border-radius:50%;background:var(--cyan);
+.think{display:flex;gap:8px;align-items:center;color:var(--dim);font-size:18px}
+.think .d{width:8px;height:8px;border-radius:50%;background:var(--cyan);
   animation:pulse 1s infinite}
 .think .d:nth-child(2){animation-delay:.2s}.think .d:nth-child(3){
   animation-delay:.4s}
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
-.bar{padding:16px 22px;border-top:1px solid var(--line);background:var(--panel2);
-  display:flex;gap:10px}
+.bar{padding:18px 26px;border-top:1px solid var(--line);background:var(--panel2);
+  display:flex;gap:12px}
 .bar input{flex:1;background:var(--panel);border:1px solid var(--line);
-  border-radius:9px;color:var(--ink);padding:12px 14px;font-size:14px}
-.bar button{background:var(--cyan);color:#061512;border:0;border-radius:9px;
-  padding:0 22px;font-weight:700;cursor:pointer;font-size:14px}
+  border-radius:10px;color:var(--ink);padding:15px 18px;font-size:18px}
+.bar button{background:var(--cyan);color:#061512;border:0;border-radius:10px;
+  padding:0 30px;font-weight:800;cursor:pointer;font-size:18px}
 .bar button:disabled{opacity:.5;cursor:default}
 .side{display:flex;flex-direction:column;background:var(--panel2);overflow:hidden}
-.side h3{padding:14px 20px;font-size:12px;text-transform:uppercase;
+.side h3{padding:16px 24px;font-size:15px;text-transform:uppercase;
   letter-spacing:1px;color:var(--dim);border-bottom:1px solid var(--line)}
-.stages{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
-.stage{display:flex;gap:11px;align-items:flex-start;padding:11px;
-  border:1px solid var(--line);border-radius:9px;background:var(--panel);
+.stages{padding:18px 24px;display:flex;flex-direction:column;gap:12px}
+.stage{display:flex;gap:14px;align-items:flex-start;padding:14px;
+  border:1px solid var(--line);border-radius:10px;background:var(--panel);
   transition:.2s}
 .stage.fire{border-color:var(--red);background:#1c1111}
 .stage.pass{border-color:#1e3a2a}
-.snum{width:24px;height:24px;border-radius:6px;background:#1a2230;display:grid;
-  place-items:center;font-weight:700;font-size:12px;flex:0 0 24px}
+.snum{width:32px;height:32px;border-radius:8px;background:#1a2230;display:grid;
+  place-items:center;font-weight:700;font-size:17px;flex:0 0 32px}
 .stage.fire .snum{background:var(--red);color:#200}
 .stage.pass .snum{background:var(--green);color:#042}
-.sname{font-weight:600;font-size:13px}
-.sdesc{color:var(--dim);font-size:12px;margin-top:2px}
-.audit{flex:1;overflow-y:auto;padding:0 20px 20px}
-.audit .ln{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--dim);
-  padding:8px 10px;border-left:2px solid var(--line);margin-top:8px;
+.sname{font-weight:700;font-size:18px}
+.sdesc{color:var(--dim);font-size:15px;margin-top:2px}
+.audit{flex:1;overflow-y:auto;padding:0 24px 24px}
+.audit .ln{font-family:ui-monospace,monospace;font-size:14px;color:var(--dim);
+  padding:10px 12px;border-left:3px solid var(--line);margin-top:10px;
   white-space:pre-wrap;word-break:break-all}
 .audit .ln.hot{border-color:var(--red);color:#ffb0b0;background:#1a0e0e}
-.metric{display:flex;gap:18px;padding:14px 20px;border-top:1px solid var(--line)}
-.metric div{font-size:12px;color:var(--dim)}
-.metric b{display:block;font-size:20px;color:var(--ink);font-weight:700}
-.empty{color:var(--dim);padding:40px 20px;text-align:center;font-size:13px}
+.metric{display:flex;gap:22px;padding:16px 24px;border-top:1px solid var(--line)}
+.metric div{font-size:15px;color:var(--dim)}
+.metric b{display:block;font-size:28px;color:var(--ink);font-weight:800}
+.empty{color:var(--dim);padding:44px 24px;text-align:center;font-size:17px}
 </style></head><body>
 <div class="top">
   <div class="logo">Shield<span>MCP</span> Agent Console</div>
@@ -345,12 +346,12 @@ body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,
       <div class="chip" id="sc-benign" onclick="pick('benign')">
         Clean internal page<small>no injection</small></div>
       <div style="flex:1"></div>
-      <label style="color:var(--dim);font-size:12px;align-self:center">
+      <label style="color:var(--dim);font-size:15px;align-self:center">
         exfil address (ask the audience):
         <input id="addr" value="archive@vendor-portal-audit.com"
           style="background:var(--panel);border:1px solid var(--line);
-          border-radius:7px;color:var(--ink);padding:7px 10px;font-size:13px;
-          font-family:ui-monospace,monospace;width:230px;margin-left:6px"></label>
+          border-radius:8px;color:var(--ink);padding:9px 12px;font-size:16px;
+          font-family:ui-monospace,monospace;width:290px;margin-left:8px"></label>
     </div>
     <div class="msgs" id="msgs"><div class="empty">
       Press <b>Run the agent</b>. A real local LLM will read the page with
