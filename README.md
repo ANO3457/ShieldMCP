@@ -1,148 +1,127 @@
 # ShieldMCP
 
-**Runtime security framework for Model Context Protocol (MCP) deployments.**
+**Open-source runtime security for Model Context Protocol (MCP) tool interactions.**
 
-ShieldMCP is a transparent proxy that sits between LLM agents and MCP servers, performing real-time validation of tool descriptions, call parameters, and responses to detect and block attacks — without requiring modifications to either the agent or the server.
+ShieldMCP validates tool metadata, outbound arguments, and inbound responses between an agent and an MCP server. It runs as a stdio or legacy SSE proxy, or as an asynchronous Python pipeline. Apache-2.0; Python 3.11+. This is an alpha research framework; deployment behavior should be tested against your own agent, tools, and workload.
+
+## Start here
+
+```bash
+git clone https://github.com/saurabh-yergattikar/ShieldMCP.git
+cd ShieldMCP
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+# Interactive pipeline demo: http://127.0.0.1:8000
+shieldmcp demo
+```
+
+The default heuristic backend needs no model downloads or API keys. The browser demo computes pipeline verdicts live against curated scenarios and user inputs; it is not a live agent benchmark. For subprocess traffic through the actual stdio proxy:
+
+```bash
+python examples/live_proxy_demo.py
+```
+
+For an independent review, start with [the red-team guide](docs/RED_TEAMING.md), [model setup and limitations](models/README.md), and the [framework evaluation](eval/run_evaluation.py).
 
 ## Architecture
 
+```text
+Agent --tools/list--> [Stage 1: metadata integrity] --> MCP server
+Agent --tools/call--> [Stage 2: argument checks]    --> MCP server
+Agent <--response--- [Stage 3: response analysis]  <-- MCP server
 ```
-Agent ──tools/list──→ ShieldMCP [Stage 1: Description Integrity] ──→ Server
-Agent ──call(params)──→ ShieldMCP [Stage 2: Parameter Sanitization] ──→ Server
-Server ──response──→ ShieldMCP [Stage 3: Response Analysis] ──→ Agent
-```
 
-### Three-Stage Validation
+| Stage | Checks | Threats addressed |
+|---|---|---|
+| 1: Description integrity | Tool descriptions, schemas, structural patterns, stored hashes | Tool poisoning, metadata changes / rug pulls, suspicious supply-chain content |
+| 2: Parameter sanitization | Schema constraints, SQL/shell/prompt patterns, path traversal | Malicious outbound arguments |
+| 3: Response analysis | Instructional spans, hidden content, context boundaries, session correlation | Indirect prompt injection and suspicious cross-tool chains |
 
-| Stage | What It Checks | Attacks Caught |
-|-------|---------------|----------------|
-| **Stage 1: Description Integrity** | Tool descriptions, parameter schemas, metadata | Tool poisoning, rug pulls, supply chain |
-| **Stage 2: Parameter Sanitization** | Outbound call arguments | SQL/shell/prompt injection, path traversal |
-| **Stage 3: Response Analysis** | Inbound tool responses | Indirect prompt injection, exfiltration, cross-tool chains |
+Detection is heuristic or model-based, with false positives and false negatives. Stage 3 runs after a tool executes: it can withhold a response, but cannot undo a side effect. Parameter checks do not replace application authorization or a general execution sandbox.
 
-## Quick Start
+## Proxy and configuration
 
 ```bash
-# Install
-pip install -e .
-
-# Launch the interactive web demo → http://127.0.0.1:8000
-shieldmcp demo
-
-# Generate default config
 shieldmcp init
-
-# Scan tool descriptions from a file
-shieldmcp scan tools.json
-
-# Run as transparent proxy
-shieldmcp proxy -- python your_mcp_server.py
-
-# Inspect the tool registry
+shieldmcp scan examples/tools.json
+shieldmcp proxy --server-id my-server -- python your_mcp_server.py
 shieldmcp registry
+
+# Legacy HTTP/SSE transport
+shieldmcp sse-proxy --backend-url http://127.0.0.1:3000
 ```
 
-## Interactive Demo
-
-`shieldmcp demo` starts a local, self-contained web interface that runs the **real**
-three-stage pipeline live — no API keys, no external network. Launch curated attacks
-from five threat families, watch each validation stage execute with per-token
-highlighting of the detected payload, and paste your own tool descriptions,
-parameters, or responses into the playground.
-
-```bash
-shieldmcp demo --host 127.0.0.1 --port 8000
-```
-
-This demonstration accompanies the EMNLP 2026 System Demonstration paper
-*"ShieldMCP: An Interactive System for Runtime Security of Model Context Protocol
-Tool Calls"* (`paper/`).
-
-### Live proxy demo (server-side, real MCP wire protocol)
-
-Prove it's a real transparent proxy, not a mock-up: a real MCP client sends framed
-JSON-RPC through `shieldmcp proxy`, which spawns real MCP servers as subprocesses
-and intercepts `tools/list`, `tools/call`, and responses live.
-
-```bash
-python examples/live_proxy_demo.py            # benign + two attack servers
-python examples/live_proxy_demo.py --attack   # attack servers only
-```
-
-You'll see a benign server pass through, a poisoned server have its malicious tools
-stripped, and an injection server have its response blocked at Stage 3 — with no
-changes to the agent or server. This is the same path deployed via
-`shieldmcp proxy -- python your_mcp_server.py`.
-
-### Reproduce the benchmark
-
-```bash
-# Framework-only eval (no API keys): 487 attacks + 200 benign, 40 servers
-python eval/run_evaluation.py --framework-only              # heuristic → 8.6% ASR
-python eval/run_evaluation.py --framework-only --classifier # DistilBERT backend
-
-# Per-call latency
-python eval/benchmarks/latency_benchmark.py --iterations 1000
-```
-
-## Configuration
-
-See `configs/default.yaml` for all options. Key settings:
+The stdio proxy accepts newline-delimited JSON-RPC and Content-Length framing. Legacy SSE support is separate; Streamable HTTP is not implemented. See [default configuration](configs/default.yaml).
 
 ```yaml
 stage1:
-  semantic_threshold: 0.72    # Score above this → quarantine
-  semantic_backend: heuristic # heuristic | llm_judge | classifier
-
+  semantic_backend: heuristic  # heuristic | llm_judge | classifier | tiered
+  semantic_threshold: 0.72
+  tiered_band_low: 0.12
 stage3:
-  cross_call_correlation: true
-  max_chain_depth: 4          # Alert on chains deeper than this
+  instruction_detection_backend: heuristic  # heuristic | classifier | tiered
+  tiered_min_words: 20
 ```
+
+`classifier` uses local fine-tuned DistilBERT detectors. `tiered` routes selected ambiguous inputs through those classifiers after inexpensive heuristic checks. Download the trained artifacts or train locally using [model setup](models/README.md). The stage wrappers log a heuristic fallback if models/dependencies cannot load; confirm the models are loaded before treating a run as classifier evaluation. The `llm_judge` Stage 1 backend requires external model access.
 
 ## Python API
 
 ```python
+import asyncio
 from shieldmcp.core.config import ShieldMCPConfig
 from shieldmcp.core.pipeline import ShieldPipeline
 
-config = ShieldMCPConfig.from_yaml("shieldmcp.yaml")
-pipeline = ShieldPipeline(config)
-await pipeline.initialize()
+async def main():
+    pipeline = ShieldPipeline(ShieldMCPConfig())
+    await pipeline.initialize()
+    try:
+        action, tools, alerts = await pipeline.validate_tools("docs", [{
+            "name": "read_page",
+            "description": "Return the text of a document.",
+            "inputSchema": {"type": "object", "properties": {
+                "id": {"type": "string"}}, "required": ["id"]},
+        }])
+        action, alerts = await pipeline.process_tool_call(
+            "docs", "read_page", {"id": "guide"}, session_id="review")
+        action, content, alerts = await pipeline.process_tool_response(
+            "docs", "read_page", "Document contents", session_id="review")
+    finally:
+        await pipeline.shutdown()
 
-# Stage 1: Validate tool descriptions
-action, filtered_tools, alerts = await pipeline.validate_tools(
-    server_id="my-server",
-    tools=[{"name": "read_file", "description": "...", "inputSchema": {...}}],
-)
-
-# Stage 2: Validate outbound call
-action, alerts = await pipeline.process_tool_call(
-    server_id="my-server",
-    tool_name="read_file",
-    parameters={"path": "/etc/passwd"},
-)
-
-# Stage 3: Validate inbound response
-action, modified_content, alerts = await pipeline.process_tool_response(
-    server_id="my-server",
-    tool_name="read_file",
-    content="file contents here...",
-)
+asyncio.run(main())
 ```
 
-## Development
+Integrators must honor returned actions before executing a call or giving content to an agent. The command-line proxy does this automatically.
+
+## Experimental governance APIs
+
+[PolicyEnforcedPipeline](src/shieldmcp/governance/enforcement.py) adds explicit failure policies, task-scoped tool exposure, and schema pinning. [SafetyGatedCache](src/shieldmcp/governance/response_cache.py) implements validated response caching with an eligibility predicate. These are opt-in Python APIs with synthetic benchmarks; they are **not wired into the default CLI proxy**. Integrators must provide the policy-aware wrapper and cache lifecycle themselves.
+
+## Evaluation and development
 
 ```bash
-# Install dev dependencies
-pip install -e ".[all]"
+pip install -e '.[all]'
+pytest -q
 
-# Run tests
-pytest
+# Framework detection evaluation: 487 attack + 200 benign scenarios
+python eval/run_evaluation.py --framework-only --output-dir /tmp/shieldmcp-heuristic-review
 
-# Lint
-ruff check src/
+# Requires trained artifacts; use separate output directories
+python eval/run_evaluation.py --framework-only --backend classifier --output-dir /tmp/shieldmcp-classifier-review
+python eval/run_evaluation.py --framework-only --backend tiered --output-dir /tmp/shieldmcp-tiered-review
+
+python eval/benchmarks/latency_benchmark.py --iterations 1000
 ```
+
+The framework harness measures detection on fixed synthetic scenarios. Its historical default result (8.6% attacks not detected; 95% benign pass) is not a live-agent exploit rate. Classifier validation and benchmark results are within-distribution; independent paraphrased, multilingual, encoded, long-context, and adaptive attacks remain important. [Raw evaluation outputs](eval/results/) and [training scripts](training/) are included for inspection.
+
+[workshop/agent_console.py](workshop/agent_console.py) uses a local Ollama model with simulated page/email tools; blocked content is replaced with a known clean demo page. [examples/trust_issues_ui.py](examples/trust_issues_ui.py) animates a scripted conversation with a real Stage 3 verdict. Neither sends email. Use `examples/live_proxy_demo.py` for actual subprocess proxy traffic.
+
+The [system demonstration paper](paper/EMNLP_Paper_Id_69_ShieldMCP_Demo_Track_AclPubCheck_Final.pdf) describes the research context. [HANDOFF.md](HANDOFF.md) records implementation status and verification boundaries.
 
 ## License
 
-Apache-2.0
+[Apache-2.0](LICENSE). The fine-tuned classifiers derive from the Apache-2.0 [DistilBERT base model](https://huggingface.co/distilbert/distilbert-base-uncased); see [model provenance](models/README.md).

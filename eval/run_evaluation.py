@@ -68,6 +68,18 @@ async def run_framework_evaluation(
 
     resolved_backend = backend or ("classifier" if use_classifier else "heuristic")
 
+    # A classifier benchmark must never silently report heuristic fallback results.
+    if resolved_backend in {"classifier", "tiered"}:
+        description_model = _s1._get_cached_classifier()
+        token_model = _s3._get_token_classifier()
+        if (description_model is None or not description_model.is_fine_tuned
+                or token_model is None or not token_model.available
+                or not token_model.is_fine_tuned):
+            raise RuntimeError(
+                "Classifier/tiered evaluation requires both fine-tuned model artifacts. "
+                "See models/README.md; refusing to label heuristic fallback as classifier results."
+            )
+
     def _make_config() -> ShieldMCPConfig:
         cfg = ShieldMCPConfig()
         cfg.stage1.semantic_backend = resolved_backend
@@ -90,6 +102,8 @@ async def run_framework_evaluation(
             "num_benign_scenarios": len(benign_scenarios),
             "defense_mode": "shieldmcp",
             "detection_backend": resolved_backend,
+            "evaluation_type": "framework_detection",
+            "outcome_basis": "detector_verdict_not_observed_agent_effect",
             "tiered_band_low": config.stage1.tiered_band_low,
             "tiered_min_words": config.stage3.tiered_min_words,
         },
@@ -247,7 +261,7 @@ def _print_attack_results(family_results: dict) -> None:
     table.add_column("Detected", justify="right", style="green")
     table.add_column("Missed", justify="right", style="red")
     table.add_column("Detection Rate", justify="right")
-    table.add_column("ASR (Attack Success)", justify="right")
+    table.add_column("Miss rate (no agent)", justify="right")
 
     total_all = 0
     detected_all = 0
@@ -300,7 +314,7 @@ def _print_benign_results(total: int, passed: int, warned: int, blocked: int) ->
     table.add_row("Passed cleanly", f"[green]{passed}[/green]")
     table.add_row("Warned (not blocked)", f"[yellow]{warned}[/yellow]")
     table.add_row("Blocked (false positive)", f"[red]{blocked}[/red]")
-    table.add_row("Task completion rate", f"[bold]{completion_rate:.1f}%[/bold]")
+    table.add_row("Framework benign pass rate", f"[bold]{completion_rate:.1f}%[/bold]")
     table.add_row("False positive rate", f"{fp_rate:.1f}%")
 
     console.print(table)

@@ -1,0 +1,39 @@
+{
+  "config": {
+    "requests": 2000,
+    "seed": 2,
+    "policy": "tiered",
+    "fail_rate": 0.1,
+    "zipf_s": 1.1,
+    "primary_backend": "classifier",
+    "population": 402,
+    "date": "2026-09-15 15:50:55"
+  },
+  "outcomes": {
+    "poisoned_requests": 753,
+    "benign_requests": 1247,
+    "unsafe_serves": 13,
+    "poisoned_refused": 4,
+    "poisoned_detector_blocked": 736,
+    "benign_served": 1131,
+    "benign_refused": 10,
+    "benign_false_blocked": 106,
+    "enforcement_stats": {
+      "primary_failures": 189,
+      "fallback_failures": 14,
+      "degraded_verdicts": 175,
+      "refusals": 14,
+      "served_unvalidated": 0,
+      "scope_stripped": 0,
+      "drift_blocks": 0,
+      "repins": 0
+    }
+  },
+  "latency_ms": {
+    "p50": 6.949791917577386,
+    "p95": 11.841292027384043,
+    "p99": 14.533375157043338,
+    "mean": 8.532613836578093,
+    "wall_seconds": 17.069007916841656
+  }
+}

@@ -13,7 +13,6 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "distilbert-base-uncased"
 _MAX_LENGTH = 512
 _LABEL_MAP = {0: "O", 1: "B-INST", 2: "I-INST"}
 _ID_MAP = {"O": 0, "B-INST": 1, "I-INST": 2}
@@ -32,7 +31,16 @@ class InstructionTokenClassifier:
         self._model: Any = None
         self._tokenizer: Any = None
         self.device = device
-        self._is_fine_tuned = model_path is not None
+        self._is_fine_tuned = False
+        self._available = False
+
+        if model_path is None or not Path(model_path).is_dir():
+            logger.warning(
+                "Fine-tuned Stage 3 model directory is missing (%s); "
+                "token classifier unavailable, use the heuristic fallback",
+                model_path,
+            )
+            return
 
         try:
             import torch
@@ -40,21 +48,19 @@ class InstructionTokenClassifier:
 
             self._torch = torch
 
-            source = model_path or _DEFAULT_MODEL
+            source = model_path
             logger.info("Loading token classifier from %s on %s", source, device)
 
-            self._tokenizer = AutoTokenizer.from_pretrained(source)
-
-            if model_path is not None:
-                self._model = AutoModelForTokenClassification.from_pretrained(
-                    source, num_labels=_NUM_LABELS
-                ).to(device)
-            else:
-                self._model = AutoModelForTokenClassification.from_pretrained(
-                    source, num_labels=_NUM_LABELS, ignore_mismatched_sizes=True
-                ).to(device)
+            self._tokenizer = AutoTokenizer.from_pretrained(source, local_files_only=True)
+            model, loading_info = AutoModelForTokenClassification.from_pretrained(
+                source, num_labels=_NUM_LABELS, local_files_only=True, output_loading_info=True
+            )
+            if loading_info.get("missing_keys") or loading_info.get("mismatched_keys"):
+                raise ValueError("Stage 3 model has missing or incompatible trained weights")
+            self._model = model.to(device)
             self._model.eval()
             self._available = True
+            self._is_fine_tuned = True
         except ImportError:
             logger.warning(
                 "transformers/torch not installed — token classifier unavailable. "
@@ -212,10 +218,16 @@ class InstructionTokenClassifier:
         from transformers import AutoModelForTokenClassification, AutoTokenizer
 
         logger.info("Loading fine-tuned token classifier from %s", path)
-        self._tokenizer = AutoTokenizer.from_pretrained(path)
-        self._model = AutoModelForTokenClassification.from_pretrained(
-            path, num_labels=_NUM_LABELS
-        ).to(self.device)
+        if not Path(path).is_dir():
+            raise ValueError("A local fine-tuned Stage 3 model directory is required")
+        tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True)
+        model, loading_info = AutoModelForTokenClassification.from_pretrained(
+            path, num_labels=_NUM_LABELS, local_files_only=True, output_loading_info=True
+        )
+        if loading_info.get("missing_keys") or loading_info.get("mismatched_keys"):
+            raise ValueError("Stage 3 model has missing or incompatible trained weights")
+        self._tokenizer = tokenizer
+        self._model = model.to(self.device)
         self._model.eval()
         self._is_fine_tuned = True
         self._available = True

@@ -32,13 +32,13 @@ logger = logging.getLogger("shieldmcp.proxy.sse")
 class _SSESession:
     """Per-client connection state."""
 
-    __slots__ = ("session_id", "response", "backend_endpoint", "last_called_tool")
+    __slots__ = ("session_id", "response", "backend_endpoint", "pending_tool_calls")
 
     def __init__(self, session_id: str, response: web.StreamResponse) -> None:
         self.session_id = session_id
         self.response = response
         self.backend_endpoint: str | None = None
-        self.last_called_tool: str | None = None
+        self.pending_tool_calls: dict[Any, str] = {}
 
 
 class SSEProxy:
@@ -150,7 +150,7 @@ class SSEProxy:
 
         # If interception produced an error (blocked), push it on the SSE
         # stream and return 202 to match normal MCP flow.
-        if intercepted is not None and "error" in intercepted:
+        if "method" in body and intercepted is not None and "error" in intercepted:
             await _write_sse(session.response, "message", json.dumps(intercepted))
             return web.Response(status=202)
 
@@ -233,13 +233,11 @@ class SSEProxy:
             params = msg.get("params", {})
             tool_name = params.get("name", "")
             arguments = params.get("arguments", {})
-            session.last_called_tool = tool_name
-
             action, alerts = await self.pipeline.process_tool_call(
                 self.server_id, tool_name, arguments, session.session_id
             )
 
-            if action == Action.BLOCK:
+            if action in (Action.BLOCK, Action.QUARANTINE):
                 logger.warning("BLOCKED tool call: %s (alerts: %d)", tool_name, len(alerts))
                 return _make_error(
                     msg.get("id"),
@@ -248,11 +246,17 @@ class SSEProxy:
                     f"{alerts[0].message if alerts else 'security policy'}",
                 )
 
+            if "id" in msg:
+                session.pending_tool_calls[msg["id"]] = tool_name
+
         return msg
 
     async def _intercept_server_message(
         self, msg: dict[str, Any], session: _SSESession
     ) -> dict[str, Any] | None:
+        tool_name = None
+        if "method" not in msg and "id" in msg:
+            tool_name = session.pending_tool_calls.pop(msg["id"], None)
         if "result" not in msg or not isinstance(msg["result"], dict):
             return msg
 
@@ -264,19 +268,18 @@ class SSEProxy:
             )
             msg = {**msg, "result": {**result, "tools": filtered_tools}}
 
-            if action == Action.BLOCK:
+            if action in (Action.BLOCK, Action.QUARANTINE):
                 logger.warning(
-                    "BLOCKED tools/list: all tools removed (alerts: %d)", len(alerts)
+                    "Filtered tools/list due to safety verdict (alerts: %d)", len(alerts)
                 )
 
         elif "content" in result:
-            tool_name = session.last_called_tool or "unknown"
             action, modified, alerts = await self.pipeline.process_tool_response(
-                self.server_id, tool_name, result["content"], session.session_id
+                self.server_id, tool_name or "unknown", result["content"], session.session_id
             )
             msg = {**msg, "result": {**result, "content": modified}}
 
-            if action == Action.BLOCK:
+            if action in (Action.BLOCK, Action.QUARANTINE):
                 return _make_error(
                     msg.get("id"),
                     -32600,

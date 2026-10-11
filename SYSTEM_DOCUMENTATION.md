@@ -1,3 +1,5 @@
+> Historical research traceability. For current implementation status, model artifacts and author-run verification, see `HANDOFF.md`, `models/README.md` and `docs/REVIEW_VERIFICATION.md`. Manuscript results and pending-work descriptions below may predate current code; they are not independent deployment evidence.
+
 # SHIELDMCP: Complete System Documentation
 
 ## Paper-to-System Traceability Report

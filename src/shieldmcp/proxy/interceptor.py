@@ -42,6 +42,8 @@ class StdioProxy:
         self.server_id = server_id
         self.pipeline = ShieldPipeline(config)
         self._server_process: asyncio.subprocess.Process | None = None
+        self._client_writer: asyncio.StreamWriter | None = None
+        self._pending_tool_calls: dict[Any, str] = {}
         # Stable per-connection session so cross-call correlation and response
         # tool-name resolution work across the whole client session.
         self._session_id: str = str(uuid.uuid4())
@@ -67,11 +69,30 @@ class StdioProxy:
             self._server_process.pid,
         )
 
-        await asyncio.gather(
-            self._client_to_server(),
-            self._server_to_client(),
-            self._log_server_stderr(),
+        writer_transport, writer_protocol = await asyncio.get_running_loop().connect_write_pipe(
+            asyncio.streams.FlowControlMixin, sys.stdout.buffer
         )
+        self._client_writer = asyncio.StreamWriter(
+            writer_transport, writer_protocol, None, asyncio.get_running_loop()
+        )
+
+        try:
+            await asyncio.gather(
+                self._client_to_server(),
+                self._server_to_client(),
+                self._log_server_stderr(),
+            )
+        finally:
+            if self._server_process.returncode is None:
+                self._server_process.terminate()
+                await self._server_process.wait()
+            await self.pipeline.shutdown()
+
+    async def _write_to_client(self, message: dict[str, Any]) -> None:
+        """Send server replies and locally generated rejections to the client."""
+        assert self._client_writer is not None
+        self._client_writer.write(_encode_frame(message, self._client_framing))
+        await self._client_writer.drain()
 
     async def _client_to_server(self) -> None:
         """Read from client (stdin), intercept, forward to server."""
@@ -86,6 +107,11 @@ class StdioProxy:
                 self._client_framing = framing
                 intercepted = await self._intercept_client_message(message)
                 if intercepted is not None:
+                    if "method" in message and "error" in intercepted:
+                        # A rejected request produces a reply for the client,
+                        # never a message for the backend server.
+                        await self._write_to_client(intercepted)
+                        continue
                     # Forward using the framing the server speaks (defaults to the
                     # spec's newline-delimited form until the server reveals otherwise).
                     frame = _encode_frame(intercepted, self._server_framing)
@@ -94,26 +120,20 @@ class StdioProxy:
         except (asyncio.CancelledError, ConnectionError):
             pass
         finally:
-            await self.pipeline.shutdown()
+            # Let the backend finish its outstanding replies and exit on EOF.
+            # The registry stays open until both relay tasks have completed.
+            self._server_process.stdin.close()
 
     async def _server_to_client(self) -> None:
         """Read from server (subprocess stdout), intercept, forward to client."""
         assert self._server_process and self._server_process.stdout
-
-        writer_transport, writer_protocol = await asyncio.get_event_loop().connect_write_pipe(
-            asyncio.streams.FlowControlMixin, sys.stdout.buffer
-        )
-        writer = asyncio.StreamWriter(writer_transport, writer_protocol, None, asyncio.get_event_loop())
 
         try:
             async for message, framing in _read_jsonrpc_messages(self._server_process.stdout):
                 self._server_framing = framing
                 intercepted = await self._intercept_server_message(message)
                 if intercepted is not None:
-                    # Forward using the framing the client speaks.
-                    frame = _encode_frame(intercepted, self._client_framing)
-                    writer.write(frame)
-                    await writer.drain()
+                    await self._write_to_client(intercepted)
         except (asyncio.CancelledError, ConnectionError):
             pass
 
@@ -139,7 +159,7 @@ class StdioProxy:
                 self.server_id, tool_name, arguments, self._session_id
             )
 
-            if action == Action.BLOCK:
+            if action in (Action.BLOCK, Action.QUARANTINE):
                 logger.warning("BLOCKED tool call: %s (alerts: %d)", tool_name, len(alerts))
                 return _make_error_response(
                     msg.get("id"),
@@ -147,10 +167,18 @@ class StdioProxy:
                     f"ShieldMCP blocked this call: {alerts[0].message if alerts else 'security policy'}",
                 )
 
+            if "id" in msg:
+                self._pending_tool_calls[msg["id"]] = tool_name
+
         return msg
 
     async def _intercept_server_message(self, msg: dict[str, Any]) -> dict[str, Any] | None:
         """Intercept inbound server→client messages."""
+        # JSON-RPC replies may arrive out of order. Resolve each tool by the
+        # request id, and retire entries for both successful and error replies.
+        tool_name = None
+        if "method" not in msg and "id" in msg:
+            tool_name = self._pending_tool_calls.pop(msg["id"], None)
         # Check if this is a tools/list response
         if "result" in msg and isinstance(msg["result"], dict):
             result = msg["result"]
@@ -162,20 +190,19 @@ class StdioProxy:
                 )
                 msg = {**msg, "result": {**result, "tools": filtered_tools}}
 
-                if action == Action.BLOCK:
+                if action in (Action.BLOCK, Action.QUARANTINE):
                     logger.warning(
-                        "BLOCKED tools/list: all tools removed (alerts: %d)", len(alerts)
+                        "Filtered tools/list due to safety verdict (alerts: %d)", len(alerts)
                     )
 
             # tools/call response has "content" key
             elif "content" in result:
-                tool_name = self._last_called_tool or "unknown"
                 action, modified, alerts = await self.pipeline.process_tool_response(
-                    self.server_id, tool_name, result["content"], self._session_id
+                    self.server_id, tool_name or "unknown", result["content"], self._session_id
                 )
                 msg = {**msg, "result": {**result, "content": modified}}
 
-                if action == Action.BLOCK:
+                if action in (Action.BLOCK, Action.QUARANTINE):
                     return _make_error_response(
                         msg.get("id"),
                         -32600,
@@ -183,15 +210,6 @@ class StdioProxy:
                     )
 
         return msg
-
-    @property
-    def _last_called_tool(self) -> str | None:
-        if self._session_id and self._session_id in self.pipeline._sessions:
-            calls = self.pipeline._sessions[self._session_id].tool_calls
-            if calls:
-                return calls[-1].tool_name
-        return None
-
 
 def _make_error_response(msg_id: Any, code: int, message: str) -> dict[str, Any]:
     return {

@@ -30,7 +30,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 REPO = Path(__file__).resolve().parents[1]
-SHIELD = str(REPO / ".venv" / "bin" / "shieldmcp")
+SHIELD = [sys.executable, "-m", "shieldmcp.cli"]
 PY = sys.executable
 
 console = Console()
@@ -38,7 +38,7 @@ console = Console()
 
 SCENARIOS = [
     {
-        "title": "Benign filesystem server — passes through",
+        "title": "Benign calculator server — passes through",
         "server_module": "eval.benign_servers",
         "server_class": "CalculatorServer",
         "server_id": "benign-calc",
@@ -114,7 +114,7 @@ def run_scenario(scenario: dict) -> None:
     # Spawn the proxy wrapping the real server
     proc = subprocess.Popen(
         [
-            SHIELD, "proxy", "--server-id", scenario["server_id"], "--log-level", "INFO",
+            *SHIELD, "proxy", "--server-id", scenario["server_id"], "--log-level", "INFO",
             "--", PY, "-m", scenario["server_module"], scenario["server_class"],
         ],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -146,6 +146,9 @@ def run_scenario(scenario: dict) -> None:
     frames = _parse_frames(out)
     console.print("\n[bold cyan]3. CLIENT receives[/bold cyan] (after ShieldMCP filtering):")
     for f in frames:
+        if "error" in f:
+            console.print(f"   ← error for request {f.get('id')}: {f['error'].get('message', 'blocked')}")
+            continue
         result = f.get("result", {})
         if "tools" in result:
             names = [t.get("name") for t in result["tools"]]

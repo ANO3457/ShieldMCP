@@ -1,0 +1,31 @@
+{
+  "config": {
+    "date": "2026-09-16 02:49:59",
+    "note": "cross-tool chains, detection-only, primary vs degraded tier; scoped exposure breaks all chains independent of backend",
+    "note2": "stage-1 description checks break 0/92 chains at either tier; detection-only coverage of chains lives entirely at the stage-3 response boundary and disappears under stage-3 outage (fail-open); scoped exposure breaks 92/92 before execution, verdict-free"
+  },
+  "runs": [
+    {
+      "backend": "tiered",
+      "ct_total": 92,
+      "chains_broken_by_detection": 0
+    },
+    {
+      "backend": "heuristic",
+      "ct_total": 92,
+      "chains_broken_by_detection": 0
+    }
+  ],
+  "runs_response_boundary": [
+    {
+      "backend": "tiered",
+      "ct_total": 92,
+      "responses_caught": 92
+    },
+    {
+      "backend": "heuristic",
+      "ct_total": 92,
+      "responses_caught": 92
+    }
+  ]
+}

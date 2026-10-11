@@ -5,14 +5,14 @@ from __future__ import annotations
 __all__: list[str] = []
 
 try:
-    from .description_classifier import DescriptionClassifier
+    from .description_classifier import DescriptionClassifier as DescriptionClassifier
 
     __all__.append("DescriptionClassifier")
 except ImportError:
     pass
 
 try:
-    from .token_classifier import InstructionTokenClassifier
+    from .token_classifier import InstructionTokenClassifier as InstructionTokenClassifier
 
     __all__.append("InstructionTokenClassifier")
 except ImportError:

@@ -19,7 +19,6 @@ from .models import (
     ToolCall,
     ToolResponse,
     ToolSignature,
-    ValidationResult,
 )
 from .registry import ToolRegistry
 from ..stage1.description_integrity import validate_tool_descriptions
@@ -38,6 +37,7 @@ class ShieldPipeline:
         self.alert_manager = AlertManager(config.alerts)
         self._sessions: dict[str, SessionContext] = {}
         self._tool_signatures: dict[str, ToolSignature] = {}  # keyed by "server_id:tool_name"
+        self._withheld_tool_alerts: dict[str, list[SecurityAlert]] = {}
         self._initialized = False
 
     async def initialize(self) -> None:
@@ -87,8 +87,23 @@ class ShieldPipeline:
         action, alerts = self.alert_manager.process_alerts(result.alerts)
 
         # Filter out blocked tools
-        blocked_tools = {a.tool_name for a in alerts if a.action == Action.BLOCK}
+        blocked_tools = {
+            a.tool_name for a in alerts if a.action in (Action.BLOCK, Action.QUARANTINE)
+        }
         filtered = [t for t in tools if t.get("name") not in blocked_tools]
+        for sig in tool_sigs:
+            key = f"{server_id}:{sig.name}"
+            blocking_alerts = [
+                alert for alert in alerts
+                if alert.tool_name == sig.name
+                and alert.action in (Action.BLOCK, Action.QUARANTINE)
+            ]
+            if blocking_alerts:
+                self._withheld_tool_alerts[key] = blocking_alerts
+            else:
+                # An explicit approval still requires a clean inventory
+                # revalidation before a previous restriction is removed.
+                self._withheld_tool_alerts.pop(key, None)
 
         elapsed = (time.perf_counter() - start) * 1000
         logger.info(
@@ -110,8 +125,16 @@ class ShieldPipeline:
         """Validate outbound tool call parameters.
 
         Returns (action, alerts).
+        Tools withheld by Stage 1 cannot be called directly by name. Tools
+        never discovered through validate_tools retain the standalone API's
+        parameter-only validation; callers must validate their inventory to
+        obtain description and approval enforcement.
         """
         start = time.perf_counter()
+        sig_key = f"{server_id}:{tool_name}"
+        withheld_alerts = self._withheld_tool_alerts.get(sig_key)
+        if withheld_alerts:
+            return self.alert_manager.process_alerts(withheld_alerts)
         session = self.get_or_create_session(session_id)
 
         call = ToolCall(
@@ -122,7 +145,6 @@ class ShieldPipeline:
         )
         session.record_call(call)
 
-        sig_key = f"{server_id}:{tool_name}"
         sig = self._tool_signatures.get(sig_key)
         if sig is None:
             sig = ToolSignature(

@@ -1,0 +1,41 @@
+{
+  "config": {
+    "requests": 2000,
+    "seed": 9,
+    "policy": "refresh",
+    "churn_rate": 0.02,
+    "refresh_every": 100,
+    "backend": "tiered",
+    "population": 72,
+    "date": "2026-09-16 02:29:36"
+  },
+  "outcomes": {
+    "malicious_drifts": 32,
+    "benign_drifts": 18,
+    "unsafe_calls": 66,
+    "window_unsafe_calls": 20,
+    "missed_unsafe_calls": 46,
+    "caught_at_call": 0,
+    "caught_at_refresh": 25,
+    "benign_calls_served": 1934,
+    "benign_calls_blocked": 0,
+    "revalidations": 69,
+    "mean_exposure_window": 120.36,
+    "enforcement_stats": {
+      "primary_failures": 0,
+      "fallback_failures": 0,
+      "degraded_verdicts": 0,
+      "refusals": 0,
+      "served_unvalidated": 0,
+      "scope_stripped": 0,
+      "drift_blocks": 0,
+      "repins": 0
+    }
+  },
+  "latency_ms": {
+    "p50": 0.33991714008152485,
+    "p95": 0.6740828976035118,
+    "p99": 0.9077079594135284,
+    "mean": 0.40923137369100004
+  }
+}

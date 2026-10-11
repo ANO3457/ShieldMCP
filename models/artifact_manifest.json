@@ -1,0 +1,123 @@
+{
+  "release": "v0.1.0-alpha.1",
+  "prepared_date": "2026-10-11",
+  "base_model": "distilbert/distilbert-base-uncased",
+  "license": "Apache-2.0",
+  "models": {
+    "stage1_classifier": {
+      "files": {
+        "LICENSE": {
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358
+        },
+        "MODEL_CARD.md": {
+          "sha256": "730acfeb01606f238b056af1f28bc85a8880555ddf64aad36761a89299fb58dc",
+          "bytes": 4631
+        },
+        "config.json": {
+          "sha256": "91a2af60075b7db8177d2bfa6cf92a73042d7377fbb7421a218fc499f7eceb1f",
+          "bytes": 782
+        },
+        "model.safetensors": {
+          "sha256": "2e683b4f562c2d70efc3b2d47a088cd7eec02d5b78385079ed81b237f47d78ab",
+          "bytes": 267832560
+        },
+        "tokenizer.json": {
+          "sha256": "91f1def9b9391fdabe028cd3f3fcc4efd34e5d1f08c3bf2de513ebb5911a1854",
+          "bytes": 711649
+        },
+        "tokenizer_config.json": {
+          "sha256": "e1c2a61a99bda00f6c55303a210b30e2f92dcf8b555e215812e2eb583e177ffd",
+          "bytes": 351
+        },
+        "training_metrics.json": {
+          "sha256": "f63df9d4304e9427aff34c51762e199dc87519477e6b77c4283255c1a47ca07d",
+          "bytes": 970
+        }
+      }
+    },
+    "stage3_token_classifier": {
+      "files": {
+        "LICENSE": {
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "bytes": 11358
+        },
+        "MODEL_CARD.md": {
+          "sha256": "730acfeb01606f238b056af1f28bc85a8880555ddf64aad36761a89299fb58dc",
+          "bytes": 4631
+        },
+        "config.json": {
+          "sha256": "cd4718d824933fb43cfaff2f1100e500cae5cda8ca659eee8d0515b413c60a61",
+          "bytes": 750
+        },
+        "eval_metrics.json": {
+          "sha256": "97b59eab401cfb8ed1bd0d4bd3d0f7abbe216b82b475060b1aebca8731a5b101",
+          "bytes": 487
+        },
+        "model.safetensors": {
+          "sha256": "8de5bddf415c8c776c23b02ad7332d79b758b07f49012b6e8706e58b8e58bc4f",
+          "bytes": 265473092
+        },
+        "tokenizer.json": {
+          "sha256": "435667fab0c06c165b1283ecb422497c37124f2d6a35b2ac73dc876332fc9518",
+          "bytes": 711494
+        },
+        "tokenizer_config.json": {
+          "sha256": "e1c2a61a99bda00f6c55303a210b30e2f92dcf8b555e215812e2eb583e177ffd",
+          "bytes": 351
+        }
+      }
+    }
+  },
+  "datasets": {
+    "stage1_all.jsonl": {
+      "sha256": "cbefb167b647d1d29152213a90c46a374f544d9bc23e9c7ececbb19703fd1571",
+      "bytes": 2150931,
+      "rows": 11600
+    },
+    "stage1_test.jsonl": {
+      "sha256": "1b67c046330c5db8afca1894b53495581e529ad50990f90e2bf4a9b368ff6706",
+      "bytes": 214052,
+      "rows": 1160
+    },
+    "stage1_train.jsonl": {
+      "sha256": "42238c4cf7e294357d599e1258b1090e4481466ed143e9e70d4f3eaddb8e5b9d",
+      "bytes": 1721156,
+      "rows": 9280
+    },
+    "stage1_val.jsonl": {
+      "sha256": "63f706bedc23b4711406f36c1d595ee2dbb4aee02f53b13d0e5718908c16ab2b",
+      "bytes": 215723,
+      "rows": 1160
+    },
+    "stage3_test.jsonl": {
+      "sha256": "8221d622d5279ae08666390a6a9f1659016886e50ee62d80b4ee515ac6202f1b",
+      "bytes": 375369,
+      "rows": 700
+    },
+    "stage3_train.jsonl": {
+      "sha256": "6b44735772a34dcde796316b32fe0c5d578b4cdae555e8a3aa50db1a1ac19074",
+      "bytes": 2984047,
+      "rows": 5600
+    },
+    "stage3_val.jsonl": {
+      "sha256": "ac3de7b040db00374ef51bbd00f7f771cea2bdedc03504ac310761ec8382643b",
+      "bytes": 388482,
+      "rows": 700
+    }
+  },
+  "archives": {
+    "shieldmcp-stage1-classifier.tar.gz": {
+      "sha256": "ba677d6e95e8e2f6b6708cd6e4d35015c2215980cf3cf47cef232bed408ded33",
+      "bytes": 248154850
+    },
+    "shieldmcp-stage3-token-classifier.tar.gz": {
+      "sha256": "4518c9594788e022135bfb95f607ef2876771024ebfbb144a9c1db0d2eaad49f",
+      "bytes": 245958361
+    },
+    "shieldmcp-synthetic-training-data.tar.gz": {
+      "sha256": "fe24eee09f29c0a81ab5f00d264b7ad6e32d7fec52ed3ce8a434f464dba0a297",
+      "bytes": 1361330
+    }
+  }
+}

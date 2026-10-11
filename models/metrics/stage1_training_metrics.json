@@ -1,0 +1,37 @@
+{
+  "train": {
+    "train_runtime": 99.8989,
+    "train_samples_per_second": 371.576,
+    "train_steps_per_second": 11.612,
+    "total_flos": 294739962009600.0,
+    "train_loss": 0.09232185672968626,
+    "epoch": 1.3793103448275863
+  },
+  "eval": {
+    "eval_loss": 0.0003018622228410095,
+    "eval_accuracy": 1.0,
+    "eval_f1": 1.0,
+    "eval_precision": 1.0,
+    "eval_recall": 1.0,
+    "eval_runtime": 1.4728,
+    "eval_samples_per_second": 787.602,
+    "eval_steps_per_second": 12.9,
+    "epoch": 1.3793103448275863
+  },
+  "args": {
+    "train_file": "training/data/stage1_train.jsonl",
+    "val_file": "training/data/stage1_val.jsonl",
+    "base_model": "distilbert-base-uncased",
+    "output_dir": "models/stage1_classifier",
+    "epochs": 4,
+    "batch_size": 32,
+    "learning_rate": 2e-05,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.1,
+    "eval_steps": 100,
+    "save_steps": 200,
+    "fp16": false,
+    "seed": 42,
+    "early_stopping_patience": 3
+  }
+}

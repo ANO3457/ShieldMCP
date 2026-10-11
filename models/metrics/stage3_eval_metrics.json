@@ -1,0 +1,17 @@
+{
+  "eval_loss": 0.000132916058646515,
+  "eval_accuracy": 0.9999856330095972,
+  "eval_precision_o": 1.0,
+  "eval_recall_o": 0.9999848148935524,
+  "eval_f1_o": 0.9999924073891289,
+  "eval_precision_b_inst": 0.99609375,
+  "eval_recall_b_inst": 1.0,
+  "eval_f1_b_inst": 0.9980430528375733,
+  "eval_precision_i_inst": 1.0,
+  "eval_recall_i_inst": 1.0,
+  "eval_f1_i_inst": 1.0,
+  "eval_runtime": 3.7709,
+  "eval_samples_per_second": 185.634,
+  "eval_steps_per_second": 5.834,
+  "epoch": 4.0
+}

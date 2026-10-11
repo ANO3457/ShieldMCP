@@ -3,7 +3,7 @@ stage1:
   structural_checks_enabled: true
   semantic_checks_enabled: true
   semantic_threshold: 0.72
-  semantic_backend: heuristic  # heuristic | llm_judge | classifier
+  semantic_backend: heuristic  # heuristic | llm_judge | classifier | tiered
   llm_judge_model: gpt-4o-mini
   rug_pull_detection: true
   quarantine_on_new_tools: false
@@ -20,7 +20,7 @@ stage2:
 stage3:
   enabled: true
   instruction_detection_enabled: true
-  instruction_detection_backend: heuristic
+  instruction_detection_backend: heuristic  # heuristic | classifier | tiered
   context_boundary_enforcement: true
   hidden_content_detection: true
   cross_call_correlation: true

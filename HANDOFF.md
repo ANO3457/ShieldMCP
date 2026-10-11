@@ -1,3 +1,23 @@
+# ShieldMCP — current reviewer handoff
+
+**Updated October 11, 2026.** Alpha research framework prepared for independent review; no partner integration or external validation is claimed.
+
+- README provides a fresh-clone quickstart, actual stdio demo, correct Python API and feature boundaries.
+- `docs/RED_TEAMING.md` is the independent reviewer entry point.
+- `docs/REVIEW_VERIFICATION.md` and `eval/results/review_2026_10_11/` record current author-run checks: 119 passing tests; heuristic/classifier/tiered synthetic evaluations.
+- Local Stage 1 and Stage 3 DistilBERT training **has been executed**. Final safetensors/tokenizers/configuration, original validation metrics and reproducible synthetic input files are distributed as `v0.1.0-alpha.1` release assets. See `models/README.md`, metrics and the artifact manifest; do not confuse training validation with independent robustness.
+- Stdio blocked replies route back to the client. Both transports correlate responses by request ID and enforce blocking/quarantine verdicts. Known filtered tools cannot be directly called; quarantine and rug-pull restrictions survive refresh until explicit approval and clean revalidation.
+- Runtime classifiers require local trained weights. Evaluation refuses missing classifier artifacts; runtime wrappers may use a logged heuristic fallback.
+- Policy-aware scope/schema/failure controls and validated caching are experimental opt-in Python APIs, not default CLI proxy protections.
+- Legacy SSE is supported; Streamable HTTP is absent. Unknown tools called before discovery receive parameter-only validation. Post-response filtering cannot undo tool side effects.
+- Demos identify simulated email, page fixtures and animated MCP messages. The subprocess demo uses actual MCP proxy traffic.
+
+The older handoff and `SYSTEM_DOCUMENTATION.md` remain historical research traceability, including earlier pending work and manuscript claims. They are not current completion or independent-result records.
+
+---
+
+## Historical handoff from July 8, 2026
+
 # ShieldMCP — Agent Handoff Document
 
 **Last updated:** July 8, 2026  

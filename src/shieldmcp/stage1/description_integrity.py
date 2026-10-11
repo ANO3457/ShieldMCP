@@ -64,6 +64,7 @@ async def validate_tool_descriptions(
                 continue  # Skip further checks — tool is blocked
 
             if not is_known and config.stage1.quarantine_on_new_tools:
+                await registry.deauthorize_tool(tool.server_id, tool.name)
                 all_alerts.append(
                     SecurityAlert(
                         alert_id=str(uuid.uuid4()),
@@ -73,6 +74,24 @@ async def validate_tool_descriptions(
                         action=Action.QUARANTINE,
                         message=f"New tool '{tool.name}' from server '{tool.server_id}' quarantined for review",
                         details={"content_hash": tool.content_hash},
+                        tool_name=tool.name,
+                        server_id=tool.server_id,
+                    )
+                )
+
+            elif is_known and not await registry.is_authorized(tool.server_id, tool.name):
+                # An unchanged hash does not constitute operator approval.
+                # Keep new-tool quarantines and previously detected rug pulls
+                # withheld across repeated inventories and proxy restarts.
+                all_alerts.append(
+                    SecurityAlert(
+                        alert_id=str(uuid.uuid4()),
+                        stage=CheckStage.PRE_CALL,
+                        severity=Severity.MEDIUM,
+                        attack_family=AttackFamily.SUPPLY_CHAIN,
+                        action=Action.QUARANTINE,
+                        message=f"Tool '{tool.name}' from server '{tool.server_id}' remains quarantined pending explicit authorization",
+                        details={"content_hash": tool.content_hash, "authorized": False},
                         tool_name=tool.name,
                         server_id=tool.server_id,
                     )
@@ -89,7 +108,7 @@ async def validate_tool_descriptions(
             all_alerts.extend(semantic_result.alerts)
 
     elapsed = (time.perf_counter() - start) * 1000
-    has_blocking = any(a.action == Action.BLOCK for a in all_alerts)
+    has_blocking = any(a.action in (Action.BLOCK, Action.QUARANTINE) for a in all_alerts)
 
     return ValidationResult(
         passed=not has_blocking,

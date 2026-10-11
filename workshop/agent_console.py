@@ -1,26 +1,16 @@
-"""ShieldMCP Agent Console: a REAL agent, misled live, then protected.
+"""Local LLM demonstration of response injection with simulated tools.
 
-A genuine local LLM (qwen2.5 via Ollama) with real tool-calling drives
-the whole thing. The model is given two tools, read_webpage and
-send_email, and asked to summarize a vendor page and email the user. The
-page is attacker-controlled.
+Ollama qwen2.5:7b-instruct selects tool calls over two model turns. The
+page is a local fixture and email calls are recorded, never delivered.
+The real ShieldPipeline checks Stage 3 when protection is enabled; on a
+block the demo substitutes its known clean fixture, not a general sanitizer.
+Stages 1 and 2 are shown for context but are not exercised here. If the
+model does not select read_webpage, the demo supplies the fixture URL.
+Model behavior can vary even with temperature zero.
 
-  SHIELD OFF: the model reads the poisoned page and, on its own, decides
-  to email the attacker's archive in addition to the user. Real
-  exfiltration, decided by the model, deterministic at temperature 0.
-
-  SHIELD ON: the real ShieldPipeline (fine-tuned classifier) detects the
-  injected directive in the tool response, strips it before the model
-  sees it, and the model completes the task safely, emailing only the
-  user.
-
-Nothing is scripted. The email recipients come from the model's own
-tool calls. Run:
-
-    python workshop/agent_console.py        # http://127.0.0.1:8099
-
-Requires Ollama running with qwen2.5:7b-instruct pulled. Offline, no API
-keys. Verdicts come from the real ShieldPipeline.
+Run from the repository root: python workshop/agent_console.py
+Requires Ollama with qwen2.5:7b-instruct and trained Stage 3 artifacts;
+otherwise the classifier wrapper logs a heuristic fallback.
 """
 
 from __future__ import annotations
@@ -117,7 +107,7 @@ async def stream(request: web.Request) -> web.StreamResponse:
     scenario = request.query.get("scenario", "poisoned")
     shield = request.query.get("shield") == "1"
     # the exfil destination is operator- (or audience-) supplied at run
-    # time, which is the live proof that nothing is pre-recorded
+    # time; email delivery remains simulated
     addr = request.query.get("addr", "").strip() or ATTACKER
     page = build_poison(addr) if scenario == "poisoned" else BENIGN
 
@@ -164,7 +154,7 @@ async def stream(request: web.Request) -> web.StreamResponse:
                      "attack_family": a.attack_family.value,
                      "severity": a.severity.value, "action": a.action.value,
                      "server": "vendor-portal", "tool": "read_webpage"}
-            # strip the injected directive before the model sees it
+            # replace the blocked response with the known clean demo fixture
             served = (BENIGN + "\n[ShieldMCP: an injected instruction was "
                       "removed from this page before you saw it.]")
 
@@ -234,50 +224,50 @@ HTML = r"""<!doctype html><html lang="en"><head><meta charset="utf-8">
   --ink:#e6edf3;--dim:#8b98ad;--cyan:#35d0ba;--red:#ff5d5d;--amber:#ffb454;
   --green:#3fe08a;--violet:#9d7cff}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--ink);font:34px/1.45 -apple-system,
+body{background:var(--bg);color:var(--ink);font:21px/1.35 -apple-system,
   BlinkMacSystemFont,"Segoe UI",sans-serif;height:100vh;overflow:hidden}
-.top{display:flex;align-items:center;gap:22px;padding:20px 32px;
+.top{display:flex;align-items:center;gap:16px;padding:10px 24px;
   border-bottom:1px solid var(--line);background:var(--panel2);flex-wrap:wrap}
-.logo{font-weight:800;letter-spacing:.5px;font-size:40px}
+.logo{font-weight:800;letter-spacing:.5px;font-size:26px}
 .logo span{color:var(--cyan)}
-.sub{color:var(--dim);font-size:24px}
-.model{font-family:ui-monospace,monospace;font-size:22px;color:var(--violet);
-  border:1px solid var(--line);border-radius:9px;padding:7px 14px}
+.sub{color:var(--dim);font-size:17px}
+.model{font-family:ui-monospace,monospace;font-size:16px;color:var(--violet);
+  border:1px solid var(--line);border-radius:7px;padding:4px 10px}
 .spacer{flex:1}
-.toggle{display:flex;align-items:center;gap:16px;padding:14px 26px;
+.toggle{display:flex;align-items:center;gap:12px;padding:8px 18px;
   border:1px solid var(--line);border-radius:999px;background:var(--panel);
   cursor:pointer;user-select:none;transition:.2s}
 .toggle.on{border-color:var(--cyan);box-shadow:0 0 0 2px var(--cyan) inset}
-.dot{width:20px;height:20px;border-radius:50%;background:var(--red)}
-.toggle.on .dot{background:var(--cyan);box-shadow:0 0 16px var(--cyan)}
-.toggle b{font-size:28px}.toggle .st{color:var(--dim);font-size:22px}
-.wrap{display:grid;grid-template-columns:1fr 680px;height:calc(100vh - 92px)}
+.dot{width:15px;height:15px;border-radius:50%;background:var(--red)}
+.toggle.on .dot{background:var(--cyan);box-shadow:0 0 14px var(--cyan)}
+.toggle b{font-size:21px}.toggle .st{color:var(--dim);font-size:16px}
+.wrap{display:grid;grid-template-columns:1fr 540px;height:calc(100vh - 54px)}
 .chat{display:flex;flex-direction:column;border-right:1px solid var(--line)}
-.scenario{display:flex;gap:16px;padding:20px 32px;flex-wrap:wrap;
+.scenario{display:flex;gap:12px;padding:10px 24px;flex-wrap:wrap;
   border-bottom:1px solid var(--line);background:var(--panel2)}
-.chip{padding:12px 22px;border:1px solid var(--line);border-radius:11px;
-  background:var(--panel);cursor:pointer;font-size:24px;color:var(--dim);
+.chip{padding:7px 16px;border:1px solid var(--line);border-radius:9px;
+  background:var(--panel);cursor:pointer;font-size:17px;color:var(--dim);
   transition:.15s}
 .chip.sel{border-color:var(--violet);color:var(--ink)}
-.chip small{display:block;color:var(--dim);font-size:18px;margin-top:3px}
-.msgs{flex:1;overflow-y:auto;padding:30px;display:flex;flex-direction:column;
-  gap:22px}
-.row{display:flex;gap:18px;animation:in .3s ease}
+.chip small{display:block;color:var(--dim);font-size:14px;margin-top:1px}
+.msgs{flex:1;overflow-y:auto;padding:16px 24px;display:flex;
+  flex-direction:column;gap:11px}
+.row{display:flex;gap:13px;animation:in .3s ease}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
-.av{width:58px;height:58px;border-radius:13px;flex:0 0 58px;display:grid;
-  place-items:center;font-size:28px;font-weight:700}
+.av{width:40px;height:40px;border-radius:10px;flex:0 0 40px;display:grid;
+  place-items:center;font-size:20px;font-weight:700}
 .av.user{background:#223}.av.agent{background:#1a2b2a;color:var(--cyan)}
 .av.server{background:#2a2230;color:var(--violet)}
 .av.shield{background:#102a1e;color:var(--green)}.av.bad{background:#2e1414;
   color:var(--red)}.av.mail{background:#1a2230;color:var(--amber)}
-.bub{flex:1;padding:20px 26px;border-radius:14px;background:var(--panel);
+.bub{flex:1;padding:11px 15px;border-radius:11px;background:var(--panel);
   border:1px solid var(--line)}
-.who{font-size:21px;color:var(--dim);margin-bottom:7px;text-transform:uppercase;
+.who{font-size:15px;color:var(--dim);margin-bottom:4px;text-transform:uppercase;
   letter-spacing:.5px}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:19px}
 .inj{color:var(--red);background:#2a0f0f;border:1px solid #4a1c1c;
-  padding:16px 20px;border-radius:11px;margin-top:12px;font-size:30px;
-  font-weight:600;line-height:1.35}
+  padding:10px 13px;border-radius:9px;margin-top:8px;font-size:19px;
+  font-weight:600;line-height:1.3}
 .cleanpart{color:var(--dim)}
 .verdict{border-color:var(--amber);background:#241c0e}
 .verdict .who{color:var(--amber)}
@@ -285,52 +275,52 @@ body{background:var(--bg);color:var(--ink);font:34px/1.45 -apple-system,
   background:#200d0d}
 .breach{border-color:var(--red);background:#200d0d}.breach .who{color:var(--red)}
 .safe{border-color:var(--green);background:#0e1f16}.safe .who{color:var(--green)}
-.tag{display:inline-block;font-size:22px;padding:4px 16px;border-radius:8px;
-  margin-right:12px;font-weight:800}
+.tag{display:inline-block;font-size:15px;padding:3px 12px;border-radius:7px;
+  margin-right:9px;font-weight:800}
 .tag.crit{background:#3a1414;color:var(--red)}
 .tag.bad{background:#3a1414;color:var(--red)}
 .tag.ok{background:#12301f;color:var(--green)}
-.think{display:flex;gap:12px;align-items:center;color:var(--dim);font-size:30px}
-.think .d{width:13px;height:13px;border-radius:50%;background:var(--cyan);
+.think{display:flex;gap:9px;align-items:center;color:var(--dim);font-size:19px}
+.think .d{width:10px;height:10px;border-radius:50%;background:var(--cyan);
   animation:pulse 1s infinite}
 .think .d:nth-child(2){animation-delay:.2s}.think .d:nth-child(3){
   animation-delay:.4s}
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
-.bar{padding:22px 32px;border-top:1px solid var(--line);background:var(--panel2);
-  display:flex;gap:16px}
+.bar{padding:13px 24px;border-top:1px solid var(--line);background:var(--panel2);
+  display:flex;gap:12px}
 .bar input{flex:1;background:var(--panel);border:1px solid var(--line);
-  border-radius:12px;color:var(--ink);padding:18px 22px;font-size:26px}
-.bar button{background:var(--cyan);color:#061512;border:0;border-radius:12px;
-  padding:0 40px;font-weight:800;cursor:pointer;font-size:26px}
+  border-radius:10px;color:var(--ink);padding:12px 16px;font-size:19px}
+.bar button{background:var(--cyan);color:#061512;border:0;border-radius:10px;
+  padding:0 30px;font-weight:800;cursor:pointer;font-size:19px}
 .bar button:disabled{opacity:.5;cursor:default}
 .side{display:flex;flex-direction:column;background:var(--panel2);overflow:hidden}
-.side h3{padding:20px 30px;font-size:22px;text-transform:uppercase;
+.side h3{padding:12px 24px;font-size:16px;text-transform:uppercase;
   letter-spacing:1px;color:var(--dim);border-bottom:1px solid var(--line)}
-.stages{padding:22px 30px;display:flex;flex-direction:column;gap:16px}
-.stage{display:flex;gap:18px;align-items:flex-start;padding:20px;
-  border:1px solid var(--line);border-radius:13px;background:var(--panel);
+.stages{padding:14px 24px;display:flex;flex-direction:column;gap:10px}
+.stage{display:flex;gap:14px;align-items:flex-start;padding:13px;
+  border:1px solid var(--line);border-radius:11px;background:var(--panel);
   transition:.2s}
 .stage.fire{border-color:var(--red);background:#1c1111}
 .stage.pass{border-color:#1e3a2a}
-.snum{width:46px;height:46px;border-radius:11px;background:#1a2230;display:grid;
-  place-items:center;font-weight:700;font-size:26px;flex:0 0 46px}
+.snum{width:34px;height:34px;border-radius:9px;background:#1a2230;display:grid;
+  place-items:center;font-weight:700;font-size:19px;flex:0 0 34px}
 .stage.fire .snum{background:var(--red);color:#200}
 .stage.pass .snum{background:var(--green);color:#042}
-.sname{font-weight:700;font-size:28px}
-.sdesc{color:var(--dim);font-size:22px;margin-top:3px}
-.audit{flex:1;overflow-y:auto;padding:0 30px 30px}
-.audit .ln{font-family:ui-monospace,monospace;font-size:21px;color:var(--dim);
-  padding:14px 16px;border-left:4px solid var(--line);margin-top:14px;
-  white-space:pre-wrap;word-break:break-all;line-height:1.4}
+.sname{font-weight:700;font-size:20px}
+.sdesc{color:var(--dim);font-size:16px;margin-top:2px}
+.audit{flex:1;overflow-y:auto;padding:0 24px 16px}
+.audit .ln{font-family:ui-monospace,monospace;font-size:15px;color:var(--dim);
+  padding:11px 13px;border-left:3px solid var(--line);margin-top:10px;
+  white-space:pre-wrap;word-break:break-all;line-height:1.35}
 .audit .ln.hot{border-color:var(--red);color:#ffb0b0;background:#1a0e0e}
-.metric{display:flex;gap:30px;padding:20px 30px;border-top:1px solid var(--line)}
-.metric div{font-size:22px;color:var(--dim)}
-.metric b{display:block;font-size:42px;color:var(--ink);font-weight:800}
-.empty{color:var(--dim);padding:56px 30px;text-align:center;font-size:26px}
+.metric{display:flex;gap:24px;padding:13px 24px;border-top:1px solid var(--line)}
+.metric div{font-size:16px;color:var(--dim)}
+.metric b{display:block;font-size:30px;color:var(--ink);font-weight:800}
+.empty{color:var(--dim);padding:40px 24px;text-align:center;font-size:19px}
 </style></head><body>
 <div class="top">
   <div class="logo">Shield<span>MCP</span> Agent Console</div>
-  <div class="sub">a real agent, misled live, then protected</div>
+  <div class="sub">local LLM &middot; simulated page/email &middot; live Stage 3 verdict</div>
   <div class="model" id="model">model: loading</div>
   <div class="spacer"></div>
   <div class="sub" id="latlabel"></div>
@@ -346,12 +336,12 @@ body{background:var(--bg);color:var(--ink);font:34px/1.45 -apple-system,
       <div class="chip" id="sc-benign" onclick="pick('benign')">
         Clean internal page<small>no injection</small></div>
       <div style="flex:1"></div>
-      <label style="color:var(--dim);font-size:22px;align-self:center">
+      <label style="color:var(--dim);font-size:16px;align-self:center">
         exfil address (ask the audience):
         <input id="addr" value="archive@vendor-portal-audit.com"
           style="background:var(--panel);border:1px solid var(--line);
-          border-radius:10px;color:var(--ink);padding:12px 16px;font-size:24px;
-          font-family:ui-monospace,monospace;width:430px;margin-left:12px"></label>
+          border-radius:8px;color:var(--ink);padding:8px 12px;font-size:17px;
+          font-family:ui-monospace,monospace;width:330px;margin-left:8px"></label>
     </div>
     <div class="msgs" id="msgs"><div class="empty">
       Press <b>Run the agent</b>. A real local LLM will read the page with
@@ -362,14 +352,14 @@ body{background:var(--bg);color:var(--ink);font:34px/1.45 -apple-system,
     </div>
   </div>
   <div class="side">
-    <h3>Three-stage pipeline</h3>
+    <h3>Pipeline overview &middot; Stage 3 exercised</h3>
     <div class="stages" id="stages">
       <div class="stage" id="st1"><div class="snum">1</div><div>
         <div class="sname">Description integrity</div>
-        <div class="sdesc">tool metadata at discovery</div></div></div>
+        <div class="sdesc">not exercised in this demo</div></div></div>
       <div class="stage" id="st2"><div class="snum">2</div><div>
         <div class="sname">Parameter sanitization</div>
-        <div class="sdesc">arguments on the way out</div></div></div>
+        <div class="sdesc">not exercised in this demo</div></div></div>
       <div class="stage" id="st3"><div class="snum">3</div><div>
         <div class="sname">Response analysis</div>
         <div class="sdesc">tool output on the way back</div></div></div>
@@ -388,7 +378,7 @@ let shield=false, scenario='poisoned', busy=false;
 function toggleShield(){if(busy)return;shield=!shield;
   const t=document.getElementById('tgl');t.classList.toggle('on',shield);
   document.getElementById('tglb').textContent='ShieldMCP '+(shield?'ON':'OFF');
-  document.getElementById('tgls').textContent=shield?'proxy in the path':'agent exposed';
+  document.getElementById('tgls').textContent=shield?'Stage 3 enabled':'agent exposed';
   document.getElementById('mmode').textContent=shield?'protected':'exposed';}
 function pick(s){if(busy)return;scenario=s;
   document.getElementById('sc-poisoned').classList.toggle('sel',s==='poisoned');
@@ -421,16 +411,16 @@ function run(){
     else if(t.step==='tool_response'){
       let b='<span class="cleanpart">'+esc(t.clean)+'</span>';
       if(t.injected && !t.shielded) b+='<div class="inj">'+esc(t.injected)+'</div>';
-      if(t.shielded) b+='<div class="inj" style="color:var(--green);background:#0e1f16;border-color:#1e3a2a">injected directive removed by ShieldMCP before the model saw it</div>';
+      if(t.shielded) b+='<div class="inj" style="color:var(--green);background:#0e1f16;border-color:#1e3a2a">blocked response replaced with the known clean demo fixture</div>';
       add('<div class="row">'+av('server','S')+'<div class="bub"><div class="who">Tool response &middot; read_webpage</div>'+b+'</div></div>');}
     else if(t.step==='verdict'){
-      document.getElementById('st1').className='stage pass';
-      document.getElementById('st2').className='stage pass';
+      document.getElementById('st1').className='stage';
+      document.getElementById('st2').className='stage';
       document.getElementById('st3').className='stage fire';
       add('<div class="row">'+av('shield','&#128737;')+'<div class="bub verdict"><div class="who">ShieldMCP verdict</div><span class="tag crit">BLOCK</span>Stage 3 &middot; '+esc(t.family)+' &middot; '+esc(t.severity)+'<br><span class="mono" style="color:var(--dim)">'+esc(t.message)+'</span></div></div>');}
     else if(t.step==='email'){rmThink();
       const bad=t.malicious;
-      add('<div class="row">'+av(bad?'bad':'mail',bad?'&#9760;':'&#9993;')+'<div class="bub mailrow'+(bad?' bad':'')+'"><div class="who">'+(bad?'Agent &middot; email to ATTACKER':'Agent &middot; email sent')+'</div><span class="tag '+(bad?'bad':'ok')+'">'+(bad?'EXFIL':'OK')+'</span><span class="mono">to '+esc(t.recipient)+' &middot; '+esc(t.subject)+'</span></div></div>');}
+      add('<div class="row">'+av(bad?'bad':'mail',bad?'&#9760;':'&#9993;')+'<div class="bub mailrow'+(bad?' bad':'')+'"><div class="who">'+(bad?'Agent &middot; simulated email to ATTACKER':'Agent &middot; simulated email')+'</div><span class="tag '+(bad?'bad':'ok')+'">'+(bad?'EXFIL':'OK')+'</span><span class="mono">to '+esc(t.recipient)+' &middot; '+esc(t.subject)+'</span></div></div>');}
     else if(t.step==='reply'){rmThink();
       add('<div class="row">'+av('agent','A')+'<div class="bub"><div class="who">Agent</div>'+esc(t.text)+'</div></div>');}
     else if(t.step==='outcome'){rmThink();
@@ -438,9 +428,9 @@ function run(){
       const label=o==='breach'?'BREACH':o==='safe'?'SAFE':'OK';
       const cls=o==='breach'?'breach':'safe';
       if(o==='breach')
-        add('<div class="row">'+av('bad','&#128165;')+'<div class="bub breach"><div class="who">Breach</div>The agent emailed the attacker. Conversation and data left the machine; the user sees only a normal summary.</div></div>');
+        add('<div class="row">'+av('bad','&#128165;')+'<div class="bub breach"><div class="who">Breach</div>The model requested an email to the attacker. Delivery is simulated; no data was sent.</div></div>');
       else if(o==='safe')
-        add('<div class="row">'+av('shield','&#9989;')+'<div class="bub safe"><div class="who">Safe</div>The injection was stripped. The agent completed the task and emailed only the user.</div></div>');
+        add('<div class="row">'+av('shield','&#9989;')+'<div class="bub safe"><div class="who">Safe</div>No attacker-directed email call was observed in this run. Email delivery is simulated.</div></div>');
       document.getElementById('mout').textContent=label;
       document.getElementById('mout').style.color=o==='breach'?'var(--red)':'var(--green)';
       document.getElementById('mms').textContent=(t.ms/1000).toFixed(1)+' s';

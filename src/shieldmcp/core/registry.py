@@ -133,6 +133,15 @@ class ToolRegistry:
         )
         await self._db.commit()
 
+    async def deauthorize_tool(self, server_id: str, tool_name: str) -> None:
+        """Withhold a registered tool until an operator explicitly approves it."""
+        assert self._db is not None
+        await self._db.execute(
+            "UPDATE tool_registry SET authorized=0 WHERE server_id=? AND tool_name=?",
+            (server_id, tool_name),
+        )
+        await self._db.commit()
+
     async def is_authorized(self, server_id: str, tool_name: str) -> bool:
         assert self._db is not None
         cursor = await self._db.execute(

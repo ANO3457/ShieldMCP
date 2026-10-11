@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MODEL = "distilbert-base-uncased"
 _MAX_LENGTH = 512
 _LABEL_MALICIOUS = 1
 
@@ -29,6 +28,13 @@ class DescriptionClassifier:
     """
 
     def __init__(self, model_path: str | None = None, device: str = "cpu") -> None:
+        if model_path is None or not Path(model_path).is_dir():
+            logger.warning(
+                "Fine-tuned Stage 1 model directory is missing (%s); "
+                "classifier unavailable, use the heuristic fallback",
+                model_path,
+            )
+            raise ValueError("A local fine-tuned Stage 1 model directory is required")
         try:
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -41,13 +47,16 @@ class DescriptionClassifier:
         self.device = device
         self._torch = torch
 
-        source = model_path or _DEFAULT_MODEL
+        source = model_path
         logger.info("Loading classifier model from %s on %s", source, device)
 
-        self.tokenizer = AutoTokenizer.from_pretrained(source)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            source, num_labels=2
-        ).to(device)
+        self.tokenizer = AutoTokenizer.from_pretrained(source, local_files_only=True)
+        model, loading_info = AutoModelForSequenceClassification.from_pretrained(
+            source, num_labels=2, local_files_only=True, output_loading_info=True
+        )
+        if loading_info.get("missing_keys") or loading_info.get("mismatched_keys"):
+            raise ValueError("Stage 1 model has missing or incompatible trained weights")
+        self.model = model.to(device)
         self.model.eval()
         self._is_fine_tuned = model_path is not None
 
@@ -83,10 +92,16 @@ class DescriptionClassifier:
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
         logger.info("Loading fine-tuned model from %s", path)
-        self.tokenizer = AutoTokenizer.from_pretrained(path)
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            path, num_labels=2
-        ).to(self.device)
+        if not Path(path).is_dir():
+            raise ValueError("A local fine-tuned Stage 1 model directory is required")
+        tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True)
+        model, loading_info = AutoModelForSequenceClassification.from_pretrained(
+            path, num_labels=2, local_files_only=True, output_loading_info=True
+        )
+        if loading_info.get("missing_keys") or loading_info.get("mismatched_keys"):
+            raise ValueError("Stage 1 model has missing or incompatible trained weights")
+        self.tokenizer = tokenizer
+        self.model = model.to(self.device)
         self.model.eval()
         self._is_fine_tuned = True
 
