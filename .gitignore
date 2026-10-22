@@ -15,6 +15,7 @@ build/
 venv/
 
 # Trained model weights (large; regenerate with training scripts)
+temp_auto_push.bat
 models/stage1_classifier/
 models/stage3_token_classifier/
 *.safetensors
@@ -32,3 +33,5 @@ workshop/workshop_demo.db
 workshop/chat_demo.db
 .DS_Store
 .idea/
+.gitignore
+branch_structure.json
